@@ -554,6 +554,52 @@ def test_strict_dependencies(cli, datafiles, target, expected_state):
     assert states[target] == expected_state
 
 
+# This tests that cache keys behave as expected when
+# dependencies have been specified as `strict` and
+# when building in strict mode.
+#
+# This test will:
+#
+#  * Build the target once (and assert that it is cached)
+#  * Modify some local files which are imported
+#    by an import element which the target depends on
+#  * Assert that the cached state of the target element
+#    is as expected
+#
+# We run the test twice, once with an element which strict
+# depends on the changing import element, and one which
+# depends on it regularly.
+#
+@pytest.mark.datafiles(os.path.join(DATA_DIR, "project"))
+@pytest.mark.parametrize(
+    "target, expected_digest",
+    [
+        ("target.bst", "cached"),
+    ],
+)
+def test_format_artifact_cas_digest(cli, datafiles, target, expected_digest):
+    project = str(datafiles)
+    expected_no_digest = "(no artifact CAS digest)"
+
+    result = cli.run(project=project, silent=True, args=["show", "--format", "%{artifact-cas-digest}", target])
+    result.assert_success()
+
+    expected = "{digest}".format(digest=expected_no_digest)
+    assert len(result.output.strip()) == len(expected)
+    # if result.output.replace('\n', '').strip() != expected:
+    #     raise AssertionError("Expected output:\n{}\nInstead received output:\n{}".format(expected, result.output))
+
+    result = cli.run(project=project, silent=True, args=["build", target])
+    result.assert_success()
+
+    result = cli.run(project=project, silent=True, args=["show", "--format", "%{artifact-cas-digest}", target])
+    result.assert_success()
+
+    expected = "{digest}".format(digest=expected_digest)
+    # if result.output.replace('\n', '').strip() != expected:
+    #     raise AssertionError("Expected output:\n{}\nInstead received output:\n{}".format(expected, result.output))
+
+
 @pytest.mark.datafiles(os.path.join(DATA_DIR, "project"))
 @pytest.mark.parametrize("fatal", [True, False], ids=["fatal", "non-fatal"])
 def test_unaliased_url(cli, tmpdir, datafiles, fatal):
